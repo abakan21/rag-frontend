@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Link2, ShieldAlert, CheckCircle2, ChevronRight, Trash2 } from 'lucide-react';
+import { Loader2, RefreshCw, Link2, ShieldAlert, CheckCircle2, ChevronRight, Trash2, FileText, X, ExternalLink, ChevronLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
@@ -22,6 +22,11 @@ const IngestionPage: React.FC = () => {
     const [deepCrawl, setDeepCrawl] = useState(false);
     const [maxDepth, setMaxDepth] = useState(2);
     const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+    const [browsingJob, setBrowsingJob] = useState<number | null>(null);
+    const [fileList, setFileList] = useState<string[]>([]);
+    const [selectedFile, setSelectedFile] = useState<string | null>(null);
+    const [fileContent, setFileContent] = useState<string | null>(null);
+    const [isFilesLoading, setIsFilesLoading] = useState(false);
 
     const loadJobs = async () => {
         try {
@@ -82,6 +87,43 @@ const IngestionPage: React.FC = () => {
             console.error(err);
             showToast("Failed to delete operation", "error");
         }
+    };
+
+    const openFileBrowser = async (jobId: number) => {
+        setBrowsingJob(jobId);
+        setIsFilesLoading(true);
+        setSelectedFile(null);
+        setFileContent(null);
+        try {
+            const response = await axios.get(`${API_BASE}/api/jobs/${jobId}/files`);
+            setFileList(response.data.files);
+        } catch (err) {
+            console.error("Failed to load files", err);
+            showToast("Failed to load files", "error");
+        } finally {
+            setIsFilesLoading(false);
+        }
+    };
+
+    const loadFileContent = async (filename: string) => {
+        setIsFilesLoading(true);
+        setSelectedFile(filename);
+        try {
+            const response = await axios.get(`${API_BASE}/api/files/${filename}`);
+            setFileContent(response.data.content);
+        } catch (err) {
+            console.error("Failed to load file content", err);
+            showToast("Failed to load file content", "error");
+        } finally {
+            setIsFilesLoading(false);
+        }
+    };
+
+    const closeFileBrowser = () => {
+        setBrowsingJob(null);
+        setFileList([]);
+        setSelectedFile(null);
+        setFileContent(null);
     };
 
     const getStatusTheme = (status: string) => {
@@ -287,6 +329,15 @@ const IngestionPage: React.FC = () => {
                                                 </span>
                                             ) : job.status}
                                         </div>
+                                        {job.status === 'COMPLETED' && (
+                                            <button 
+                                                onClick={() => openFileBrowser(job.id)}
+                                                className="p-2 text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                                                title="Browse Files"
+                                            >
+                                                <FileText className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         <button 
                                             onClick={() => handleDelete(job.id)}
                                             className="p-2 text-text-secondary hover:text-error hover:bg-error/10 rounded-lg transition-colors"
@@ -301,6 +352,117 @@ const IngestionPage: React.FC = () => {
                     </AnimatePresence>
                 </div>
             </motion.div>
+
+            {/* File Browser Overlay */}
+            <AnimatePresence>
+                {browsingJob !== null && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-end">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={closeFileBrowser}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div 
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="relative w-full max-w-2xl h-full bg-surface border-l border-border shadow-2xl flex flex-col"
+                        >
+                            <div className="p-6 border-b border-border flex justify-between items-center bg-surface/50 backdrop-blur-md sticky top-0 z-10">
+                                <div className="flex items-center gap-3">
+                                    {selectedFile ? (
+                                        <button 
+                                            onClick={() => { setSelectedFile(null); setFileContent(null); }}
+                                            className="p-2 hover:bg-white/10 rounded-lg transition-colors mr-1"
+                                        >
+                                            <ChevronLeft className="w-5 h-5" />
+                                        </button>
+                                    ) : (
+                                        <div className="p-2 bg-accent/20 rounded-lg text-accent">
+                                            <FileText className="w-5 h-5" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h3 className="font-bold text-lg leading-tight">
+                                            {selectedFile ? 'Content Viewer' : 'Extracted Documents'}
+                                        </h3>
+                                        <p className="text-xs text-text-secondary uppercase tracking-widest font-mono">
+                                            JOB-{browsingJob.toString().padStart(4, '0')}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={closeFileBrowser}
+                                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6">
+                                {isFilesLoading ? (
+                                    <div className="h-full flex flex-col items-center justify-center space-y-4 opacity-50">
+                                        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                                        <p className="text-sm font-medium">Accessing vault...</p>
+                                    </div>
+                                ) : selectedFile ? (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="prose prose-invert prose-accent max-w-none"
+                                    >
+                                        <div className="mb-6 p-4 rounded-xl bg-white/5 border border-border flex justify-between items-center group">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="p-2 bg-white/10 rounded-lg">
+                                                    <FileText className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-sm font-mono truncate text-text-secondary">{selectedFile}</span>
+                                            </div>
+                                            <ExternalLink className="w-4 h-4 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                        <div className="glass-panel p-6 overflow-x-auto">
+                                            <ReactMarkdown className="markdown-content">
+                                                {fileContent || ''}
+                                            </ReactMarkdown>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {fileList.length === 0 ? (
+                                            <div className="text-center py-20 opacity-50">
+                                                <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                                <p>No documents extracted for this operation.</p>
+                                            </div>
+                                        ) : (
+                                            fileList.map((file, idx) => (
+                                                <motion.button
+                                                    key={file}
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    onClick={() => loadFileContent(file)}
+                                                    className="w-full text-left glass-panel p-4 flex items-center justify-between hover:bg-white/5 hover:border-accent/40 transition-all group"
+                                                >
+                                                    <div className="flex items-center gap-4 min-w-0">
+                                                        <div className="p-2 bg-surface border border-border rounded-lg group-hover:text-accent group-hover:border-accent/30 transition-colors">
+                                                            <FileText className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="font-mono text-sm truncate">{file}</span>
+                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 text-text-secondary group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                                                </motion.button>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {toast && (
