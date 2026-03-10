@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { Loader2, RefreshCw, Link2, ShieldAlert, CheckCircle2, ChevronRight, Trash2, FileText, X, ExternalLink, ChevronLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -286,7 +287,7 @@ const IngestionPage: React.FC = () => {
                                 <p className="text-text-secondary">Awaiting initial task submission...</p>
                             </motion.div>
                         ) : (
-                            jobs.map((job) => {
+                            jobs.map((job: Job) => {
                                 const theme = getStatusTheme(job.status);
                                 return (
                                 <motion.div 
@@ -424,9 +425,11 @@ const IngestionPage: React.FC = () => {
                                             <ExternalLink className="w-4 h-4 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                         <div className="glass-panel p-6 overflow-x-auto">
-                                            <ReactMarkdown className="markdown-content">
-                                                {fileContent || ''}
-                                            </ReactMarkdown>
+                                            <div className="markdown-content">
+                                                <ReactMarkdown>
+                                                    {fileContent || ''}
+                                                </ReactMarkdown>
+                                            </div>
                                         </div>
                                     </motion.div>
                                 ) : (
@@ -437,7 +440,7 @@ const IngestionPage: React.FC = () => {
                                                 <p>No documents extracted for this operation.</p>
                                             </div>
                                         ) : (
-                                            fileList.map((file, idx) => (
+                                            fileList.map((file: string, idx: number) => (
                                                 <motion.button
                                                     key={file}
                                                     initial={{ opacity: 0, x: 20 }}

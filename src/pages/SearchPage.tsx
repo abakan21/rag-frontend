@@ -7,7 +7,7 @@ const API_BASE = "http://127.0.0.1:8000";
 
 interface SearchResult {
     answer: string;
-    sources: { path: string; score: number }[];
+    sources: { path: string; score: number; filename?: string }[];
 }
 
 const SearchPage: React.FC = () => {
@@ -15,6 +15,7 @@ const SearchPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<SearchResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<{name: string, content: string} | null>(null);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,6 +33,17 @@ const SearchPage: React.FC = () => {
             setError("Failed to fetch search results from the RAG API. Ensure Qdrant dependencies are installed.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOpenFile = async (filename: string) => {
+        try {
+            const response = await axios.get(`${API_BASE}/api/files/${filename}`);
+            setSelectedFile({ name: filename, content: response.data.content });
+        } catch (err) {
+            console.error("Failed to load file content", err);
+            // Můžeme nastavit error state, ale pro teď postačí prázdný content
+            setSelectedFile({ name: filename, content: "Obsah souboru se nepodařilo načíst." });
         }
     };
 
@@ -172,6 +184,14 @@ const SearchPage: React.FC = () => {
                                                         {(source.score * 100).toFixed(1)}% Match
                                                     </span>
                                                 </div>
+                                                {source.filename && (
+                                                    <button 
+                                                        onClick={() => handleOpenFile(source.filename!)}
+                                                        className="mt-2 text-xs flex items-center gap-1 text-accent hover:text-accent-hover transition-colors bg-accent/10 px-3 py-1.5 rounded-lg w-full justify-center border border-accent/20 hover:border-accent/50"
+                                                    >
+                                                        Zobrazit zdrojový dokument
+                                                    </button>
+                                                )}
                                             </div>
                                         ))
                                     )}
@@ -181,6 +201,42 @@ const SearchPage: React.FC = () => {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* File Viewer Modal */}
+            <AnimatePresence>
+                {selectedFile && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setSelectedFile(null)}
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            className="bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between p-4 border-b border-border bg-surface-hover">
+                                <h3 className="font-medium text-white truncate pr-4 text-sm">
+                                    {selectedFile.name}
+                                </h3>
+                                <button 
+                                    onClick={() => setSelectedFile(null)}
+                                    className="p-1 px-3 text-sm text-text-secondary hover:text-white hover:bg-white/10 rounded transition-colors"
+                                >
+                                    Zavřít
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-black/20 font-mono text-sm leading-relaxed text-text-secondary whitespace-pre-wrap">
+                                {selectedFile.content}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };
