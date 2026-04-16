@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     keycloak
-      .init({ checkLoginIframe: false })
+      .init({ onLoad: 'check-sso', checkLoginIframe: false })
       .then(() => {
         extractUser();
       })
